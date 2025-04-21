@@ -1,10 +1,12 @@
-import os, sys
+import os, sys, time
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+# from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaIoBaseUpload
 from google.auth.transport.requests import Request
 from tkinter import messagebox
+from chunk_files import ChunkedFileReader
 
 class Authentication:
     # If modifying these SCOPES, delete the file token.json
@@ -47,16 +49,17 @@ class Authentication:
             return creds
         except Exception as e:
             print(f"❌ Authentication failed or cancelled: {e}")
-            return False  # Login was cancelled or failed
+            return False
 
 class UploadToDrive(Authentication):
-    def __init__(self):
+    MB = 1048576
+    
+    def upload_or_replace_file(self, filepath, mimetype='application/octet-stream', progress_callback=None):
+        from googleapiclient.http import MediaIoBaseUpload
+        import os
         self.service = build('drive', 'v3', credentials=self.authenticate())
 
-    def upload_or_replace_file(self, filepath, mimetype='application/octet-stream'):
         file_name = os.path.basename(filepath)
-
-        # Search for existing file
         results = self.service.files().list(
             q=f"name='{file_name}' and trashed = false",
             spaces='drive',
@@ -65,24 +68,30 @@ class UploadToDrive(Authentication):
 
         files = results.get('files', [])
 
+        file_reader = ChunkedFileReader(filepath)
+        media = MediaIoBaseUpload(file_reader, mimetype=mimetype, chunksize=1024 * 1024, resumable=True)
+
         if files:
             file_id = files[0]['id']
-            print(f"File exists. Updating file ID: {file_id}")
-            media = MediaFileUpload(filepath, mimetype=mimetype)
-            updated_file = self.service.files().update(fileId=file_id, media_body=media).execute()
-
-            msg = f"Updated File ID: {updated_file.get('id')}"
-            print(msg)
-            return msg
+            request = self.service.files().update(fileId=file_id, media_body=media)
+            alert_text = "File updated successfully"
         else:
-            print("Uploading new file.")
             file_metadata = {'name': file_name}
-            media = MediaFileUpload(filepath, mimetype=mimetype)
-            file = self.service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+            request = self.service.files().create(body=file_metadata, media_body=media)
+            alert_text = "File uploaded successfully"
 
-            msg = f'Uploaded File ID: {file.get("id")}'
-            print(msg)
-            return msg
+        response = None
+        while response is None:
+            status, response = request.next_chunk()
+            if status and progress_callback:
+                progress_callback(status.progress())
+            elif response and progress_callback:
+                # 100% when done
+                progress_callback(1.0)
+
+        file_reader.close()
+        return alert_text
+
 
 
 class ManageFiles(Authentication):
@@ -96,6 +105,7 @@ class ManageFiles(Authentication):
                 fields="files(id, name, mimeType, size, modifiedTime)"
             ).execute()
             return results.get('files', [])
+
         except Exception as e:
             print(f"❌ Failed to list files: {e}")
             return []
