@@ -1,1 +1,0 @@
---add-data="C:\Users\Komeil\AppData\Roaming\Python\Python312\site-packages\certifi\cacert.pem;certifi"
