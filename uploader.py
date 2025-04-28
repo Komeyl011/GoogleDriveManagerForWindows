@@ -102,8 +102,9 @@ class ManageFiles(Authentication):
         try:
             results = self.service.files().list(
                 pageSize=page_size,
-                fields="files(id, name, mimeType, size, modifiedTime)"
+                fields="files(id, name, mimeType, size, modifiedTime, trashed)"
             ).execute()
+
             return results.get('files', [])
 
         except Exception as e:
@@ -128,7 +129,8 @@ class ManageFiles(Authentication):
         
     def delete_file(self, file_id):
         try:
-            self.service.files().delete(fileId=file_id).execute()
+            # self.service.files().delete(fileId=file_id).execute()
+            self.service.files().update(fileId=file_id, body={'trashed': True}).execute()
             return True
         except Exception as e:
             print(f"❌ Delete failed: {e}")

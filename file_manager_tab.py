@@ -75,9 +75,10 @@ class DriveFileManager(ttk.Frame):
                     self.tree.delete(item)
 
                 for f in files:
-                    size_in_bytes = int(f.get("size", 0))
-                    size_mb = f"{size_in_bytes / self.MB:.2f}"
-                    self.tree.insert("", "end", values=(f["name"], f["id"], size_mb))
+                    if not f['trashed']:
+                        size_in_bytes = int(f.get("size", 0))
+                        size_mb = f"{size_in_bytes / self.MB:.2f}"
+                        self.tree.insert("", "end", values=(f["name"], f["id"], size_mb))
 
                 self.config(cursor="")
                 self.refresh_btn.config(bootstyle=PRIMARY, state="normal")
