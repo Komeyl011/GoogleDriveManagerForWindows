@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 import uploader
 import upload_gui_ttkbs
 from tkinter import messagebox
@@ -10,10 +11,9 @@ if __name__ == "__main__":
     check = driveUploader.check_authentication()
     if not check:
         success = driveUploader.authenticate()
-        # print(success)
         if not success:
             messagebox.showerror("Authentication Failed", "Login was cancelled or failed.")
-            sys.exit(1)  # Stop the app
+            sys.exit(1)
 
     app = upload_gui_ttkbs.DriveUploaderGUI()
     app.mainloop()

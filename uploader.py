@@ -1,29 +1,32 @@
-import os, sys, time
+import os
+import sys
+import io
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-# from googleapiclient.http import MediaFileUpload
-from googleapiclient.http import MediaIoBaseUpload
 from google.auth.transport.requests import Request
 from tkinter import messagebox
 from chunk_files import ChunkedFileReader
+from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseDownload
+
 
 class Authentication:
-    # If modifying these SCOPES, delete the file token.json
     SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
     def get_resource_path(self, relative_path):
-        """Get absolute path for PyInstaller bundled files."""
         if hasattr(sys, '_MEIPASS'):
             return os.path.join(sys._MEIPASS, relative_path)
         return os.path.join(os.path.abspath("."), relative_path)
-    
+
     def get_token_path(self):
         return os.path.join(os.path.expanduser("~"), ".gdrive_uploader", "token.json")
-    
+
     def check_authentication(self):
         if not os.path.exists(self.get_token_path()):
-            messagebox.showwarning("Token Missing", "The token.json file is missing.\nYou will now be redirected to the browser to authorize your app.\nYou have to complete the login within 1 minute or less.")
+            messagebox.showwarning("Token Missing", "The token.json file is missing.\nYou will now be redirected to "
+                                                    "the browser to authorize your app.\nYou have to complete the "
+                                                    "login within 1 minute or less.")
             return False
 
     def authenticate(self):
@@ -37,7 +40,8 @@ class Authentication:
                 if creds and creds.expired and creds.refresh_token:
                     creds.refresh(Request())
                 else:
-                    flow = InstalledAppFlow.from_client_secrets_file(self.get_resource_path('credentials.json'), self.SCOPES)
+                    flow = InstalledAppFlow.from_client_secrets_file(self.get_resource_path('credentials.json'),
+                                                                     self.SCOPES)
                     creds = flow.run_local_server(port=0, timeout_seconds=60)
 
                 # Save the credentials for next run
@@ -51,12 +55,17 @@ class Authentication:
             print(f"❌ Authentication failed or cancelled: {e}")
             return False
 
+
 class UploadToDrive(Authentication):
     MB = 1048576
-    
+
+    def upload_file(file_path):
+        if not file_path:
+            return "Please select a file."
+
+        return f"File '{os.path.basename(file_path)}' uploaded."
+
     def upload_or_replace_file(self, filepath, mimetype='application/octet-stream', progress_callback=None):
-        from googleapiclient.http import MediaIoBaseUpload
-        import os
         self.service = build('drive', 'v3', credentials=self.authenticate())
 
         file_name = os.path.basename(filepath)
@@ -93,11 +102,10 @@ class UploadToDrive(Authentication):
         return alert_text
 
 
-
 class ManageFiles(Authentication):
     def __init__(self):
         self.service = build('drive', 'v3', credentials=self.authenticate())
-    
+
     def list_files(self, page_size=20):
         try:
             results = self.service.files().list(
@@ -110,12 +118,9 @@ class ManageFiles(Authentication):
         except Exception as e:
             print(f"❌ Failed to list files: {e}")
             return []
-        
+
     def download_file(self, file_id, save_path):
         try:
-            from googleapiclient.http import MediaIoBaseDownload
-            import io
-
             request = self.service.files().get_media(fileId=file_id)
             fh = io.FileIO(save_path, 'wb')
             downloader = MediaIoBaseDownload(fh, request)
@@ -126,7 +131,7 @@ class ManageFiles(Authentication):
         except Exception as e:
             print(f"❌ Download failed: {e}")
             return False, None
-        
+
     def delete_file(self, file_id):
         try:
             # self.service.files().delete(fileId=file_id).execute()
@@ -135,4 +140,3 @@ class ManageFiles(Authentication):
         except Exception as e:
             print(f"❌ Delete failed: {e}")
             return False
-
